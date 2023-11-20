@@ -4,7 +4,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/Crosse/godivert"
+	"github.com/bogushevich/godivert"
 )
 
 var cloudflareDNS = net.ParseIP("1.1.1.1")

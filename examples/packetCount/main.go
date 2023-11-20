@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Crosse/godivert"
-	"github.com/Crosse/godivert/header"
+	"github.com/bogushevich/godivert"
+	"github.com/bogushevich/godivert/header"
 )
 
 var icmpv4, icmpv6, udp, tcp, unknown, served uint

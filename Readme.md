@@ -10,12 +10,12 @@ _Note: this project was forked from <https://github.com/Macronut/godivert>, whic
 ## Installation
 
 ```bash
-go get github.com/Crosse/godivert
+go get github.com/bogushevich/godivert
 ```
 
 ## Introduction
 
-The binding's documentation can be found [Here](https://godoc.org/github.com/Crosse/godivert).
+The binding's documentation can be found [Here](https://godoc.org/github.com/bogushevich/godivert).
 
 If you don't have the **WinDivert dll** installed on your System or you want to load a specific **WinDivert dll** you
 should do :
@@ -55,7 +55,7 @@ packet.Send(winDivert) // Sends the packet back on the network stack
 ```
 
 You can get and set values from the packet's header by using the **_header_** package. Documentation on this package can
-be found [Here](https://godoc.org/github.com/Crosse/godivert/header) .
+be found [Here](https://godoc.org/github.com/bogushevich/godivert/header) .
 
 As the packet has been modified the **checksums** have to be recalculated before sending it back on the network stack.
 
@@ -65,7 +65,7 @@ calling **packet.CalcNewChecksum**.
 To receive packets you can also use **winDivert.Packets**.
 
 ```go
-packetChan, err := winDivert.Packets()
+packetChan, _, err := winDivert.Packets()
 ```
 
 Here **_packetChan_** is a channel of **\*godivert.Packet** coming directly from the network stack.
@@ -82,7 +82,7 @@ package main
 
 import (
     "fmt"
-    "github.com/Crosse/godivert"
+    "github.com/bogushevich/godivert"
 )
 
 func main() {
@@ -114,7 +114,7 @@ package main
 import (
     "net"
     "time"
-    "github.com/Crosse/godivert"
+    "github.com/bogushevich/godivert"
 )
 
 var cloudflareDNS = net.ParseIP("1.1.1.1")
@@ -134,7 +134,7 @@ func main() {
     }
     defer winDivert.Close()
 
-    packetChan, err := winDivert.Packets()
+    packetChan, _, err := winDivert.Packets()
     if err != nil {
         panic(err)
     }
@@ -161,8 +161,8 @@ package main
 import (
     "fmt"
     "time"
-    "github.com/Crosse/godivert"
-    "github.com/Crosse/godivert/header"
+    "github.com/bogushevich/godivert"
+    "github.com/bogushevich/godivert/header"
 )
 
 var icmpv4, icmpv6, udp, tcp, unknown, served uint
@@ -200,7 +200,7 @@ func main() {
     fmt.Println("Starting")
     defer winDivert.Close()
 
-    packetChan, err := winDivert.Packets()
+    packetChan, _, err := winDivert.Packets()
     if err != nil {
         panic(err)
     }

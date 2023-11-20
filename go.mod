@@ -1,4 +1,4 @@
-module github.com/Crosse/godivert
+module github.com/bogushevich/godivert
 
 go 1.17
 
