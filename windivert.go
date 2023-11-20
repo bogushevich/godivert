@@ -108,6 +108,17 @@ func (wd *WinDivertHandle) Recv() (*Packet, error) {
 		uintptr(unsafe.Pointer(&packetLen)),
 		uintptr(unsafe.Pointer(&addr)))
 
+	/*
+	  https://reqrypt.org/windivert-doc.html#divert_recv
+	  "If the pPacket buffer is too small, the packet will be truncated and the operation will fail
+	  with the ERROR_INSUFFICIENT_BUFFER error code. __This error can be ignored__ if the application only
+	  intends to receive part of the packet, e.g., the IP headers only."
+	*/
+	if success == 0 && err == windows.ERROR_INSUFFICIENT_BUFFER {
+		success = 1
+		packetLen = uint(len(packetBuffer))
+	}
+
 	if success == 0 {
 		return nil, err
 	}
