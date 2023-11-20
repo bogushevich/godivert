@@ -212,11 +212,17 @@ func HelperEvalFilter(packet *Packet, filter string) (bool, error) {
 
 // A loop that capture packets by calling Recv and sends them on a channel as long as the handle is open
 // If Recv() returns an error, the loop is stopped and the channel is closed
-func (wd *WinDivertHandle) recvLoop(packetChan chan<- *Packet) {
+func (wd *WinDivertHandle) recvLoop(packetChan chan<- *Packet, errorChan chan<- error) {
 	for wd.open {
 		packet, err := wd.Recv()
 		if err != nil {
-			//close(packetChan)
+			close(packetChan)
+
+			go func() {
+				errorChan <- err
+				close(errorChan)
+			}()
+
 			break
 		}
 
@@ -225,11 +231,12 @@ func (wd *WinDivertHandle) recvLoop(packetChan chan<- *Packet) {
 }
 
 // Create a new channel that will be used to pass captured packets and returns it calls recvLoop to maintain a loop
-func (wd *WinDivertHandle) Packets() (chan *Packet, error) {
+func (wd *WinDivertHandle) Packets() (chan *Packet, <-chan error, error) {
 	if !wd.open {
-		return nil, errors.New("the handle isn't open")
+		return nil, nil, errors.New("the handle isn't open")
 	}
 	packetChan := make(chan *Packet, PacketChanCapacity)
-	go wd.recvLoop(packetChan)
-	return packetChan, nil
+	errorChan := make(chan error)
+	go wd.recvLoop(packetChan, errorChan)
+	return packetChan, errorChan, nil
 }

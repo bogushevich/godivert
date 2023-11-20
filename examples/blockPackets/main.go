@@ -24,7 +24,7 @@ func main() {
 	}
 	defer winDivert.Close()
 
-	packetChan, err := winDivert.Packets()
+	packetChan, _, err := winDivert.Packets()
 	if err != nil {
 		panic(err)
 	}

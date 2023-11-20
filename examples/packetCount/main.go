@@ -41,7 +41,7 @@ func main() {
 
 	fmt.Println("Starting")
 
-	packetChan, err := winDivert.Packets()
+	packetChan, _, err := winDivert.Packets()
 	if err != nil {
 		panic(err)
 	}
