@@ -8,6 +8,7 @@ type IPHeader interface {
 
 	Version() int
 	HeaderLen() uint8
+	TotalLen() uint16
 	NextHeader() uint8
 	SrcIP() net.IP
 	DstIP() net.IP

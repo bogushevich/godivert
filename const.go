@@ -12,8 +12,10 @@ func (d Direction) String() string {
 }
 
 const (
-	PacketBufferSize   = 128
-	PacketChanCapacity = 256
+	PacketBufferSize       = 1500
+	PacketsInBatch         = 128
+	PacketsBatchBufferSize = PacketBufferSize * PacketsInBatch
+	PacketChanCapacity     = 256
 
 	WinDivertDirectionOutbound Direction = 1
 	WinDivertDirectionInbound  Direction = 0

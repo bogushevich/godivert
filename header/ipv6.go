@@ -64,6 +64,14 @@ func (h *IPv6Header) PayloadLen() uint16 {
 	return binary.BigEndian.Uint16(h.Raw[4:6])
 }
 
+func (h *IPv6Header) TotalLen() uint16 {
+	// result wil be invalid for:
+	// - Jumbo Payload;
+	// - for PayloadLen() around max uint16 value
+	// but we does not expect such cases in real life
+	return h.PayloadLen() + 40
+}
+
 // Reads the header's bytes and returns the protocol number
 func (h *IPv6Header) NextHeader() uint8 {
 	return h.Raw[6]

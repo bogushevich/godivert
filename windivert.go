@@ -2,6 +2,7 @@ package godivert
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"unsafe"
 
@@ -14,6 +15,7 @@ var (
 	winDivertOpen                *windows.LazyProc
 	winDivertClose               *windows.LazyProc
 	winDivertRecv                *windows.LazyProc
+	winDivertRecvEx              *windows.LazyProc
 	winDivertSend                *windows.LazyProc
 	winDivertHelperCalcChecksums *windows.LazyProc
 	winDivertHelperEvalFilter    *windows.LazyProc
@@ -46,6 +48,7 @@ func LoadDLL(path64, path32 string) {
 	winDivertOpen = winDivertDLL.NewProc("WinDivertOpen")
 	winDivertClose = winDivertDLL.NewProc("WinDivertClose")
 	winDivertRecv = winDivertDLL.NewProc("WinDivertRecv")
+	winDivertRecvEx = winDivertDLL.NewProc("WinDivertRecvEx")
 	winDivertSend = winDivertDLL.NewProc("WinDivertSend")
 	winDivertHelperCalcChecksums = winDivertDLL.NewProc("WinDivertHelperCalcChecksums")
 	winDivertHelperEvalFilter = winDivertDLL.NewProc("WinDivertHelperEvalFilter")
@@ -116,7 +119,7 @@ func (wd *WinDivertHandle) Recv() (*Packet, error) {
 	*/
 	if success == 0 && err == windows.ERROR_INSUFFICIENT_BUFFER {
 		success = 1
-		packetLen = uint(len(packetBuffer))
+		packetLen = uint(PacketBufferSize)
 	}
 
 	if success == 0 {
@@ -130,6 +133,77 @@ func (wd *WinDivertHandle) Recv() (*Packet, error) {
 	}
 
 	return packet, nil
+}
+
+func (wd *WinDivertHandle) RecvEx(packetBuffer []byte) (ret []*Packet, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("%v", r)
+		}
+	}()
+
+	if !wd.open {
+		return nil, errors.New("can't receive, the handle isn't open")
+	}
+
+	var packetBufLen uint
+
+	addrSize := uint(unsafe.Sizeof(WinDivertAddress{}))
+	addrBuf := make([]WinDivertAddress, PacketsInBatch)
+	addrBufLen := addrSize * PacketsInBatch
+
+	success, _, errCall := winDivertRecvEx.Call(wd.handle,
+		uintptr(unsafe.Pointer(&packetBuffer[0])),
+		uintptr(PacketsBatchBufferSize),
+		uintptr(unsafe.Pointer(&packetBufLen)),
+		uintptr(0),
+		uintptr(unsafe.Pointer(&addrBuf[0])),
+		uintptr(unsafe.Pointer(&addrBufLen)),
+		uintptr(0),
+	)
+
+	/*
+	  https://reqrypt.org/windivert-doc.html#divert_recv
+	  "If the pPacket buffer is too small, the packet will be truncated and the operation will fail
+	  with the ERROR_INSUFFICIENT_BUFFER error code. __This error can be ignored__ if the application only
+	  intends to receive part of the packet, e.g., the IP headers only."
+	*/
+	if success == 0 {
+		if errCall != windows.ERROR_INSUFFICIENT_BUFFER {
+			return nil, errCall
+		}
+
+		packetBufLen = PacketsBatchBufferSize
+	}
+
+	var nextPktHead uint
+	actualPacketsInBatch := int(addrBufLen / addrSize)
+	ret = make([]*Packet, 0, actualPacketsInBatch)
+
+	for i := 0; i < actualPacketsInBatch; i++ {
+		if nextPktHead >= packetBufLen {
+			break
+		}
+
+		p := &Packet{
+			Raw:       packetBuffer[nextPktHead:packetBufLen],
+			Addr:      &addrBuf[i],
+			PacketLen: packetBufLen,
+		}
+		p.ParseHeaders()
+
+		actualPacketLen := uint(p.IpHdr.TotalLen())
+		p.PacketLen = actualPacketLen
+		nextPktHead += actualPacketLen
+
+		if actualPacketLen < uint(len(p.Raw)) {
+			p.Raw = p.Raw[:actualPacketLen]
+		}
+
+		ret = append(ret, p)
+	}
+
+	return ret, nil
 }
 
 // Inject the packet on the Network Stack
@@ -213,20 +287,24 @@ func HelperEvalFilter(packet *Packet, filter string) (bool, error) {
 // A loop that capture packets by calling Recv and sends them on a channel as long as the handle is open
 // If Recv() returns an error, the loop is stopped and the channel is closed
 func (wd *WinDivertHandle) recvLoop(packetChan chan<- *Packet, errorChan chan<- error) {
+	packetsBatchBuffer := make([]byte, PacketsBatchBufferSize)
 	for wd.open {
-		packet, err := wd.Recv()
+		packets, err := wd.RecvEx(packetsBatchBuffer)
 		if err != nil {
-			close(packetChan)
+			// The handle has been shutdown using WinDivertShutdown() and the packet queue is empty.
+			// https://reqrypt.org/windivert-doc.html#divert_recv
+			if err == windows.ERROR_NO_DATA {
+				close(packetChan)
+				return
+			}
 
-			go func() {
-				errorChan <- err
-				close(errorChan)
-			}()
-
-			break
+			errorChan <- err
+			continue
 		}
 
-		packetChan <- packet
+		for _, packet := range packets {
+			packetChan <- packet
+		}
 	}
 }
 

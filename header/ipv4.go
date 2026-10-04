@@ -15,6 +15,10 @@ type IPv4Header struct {
 
 func NewIPv4Header(raw []byte) *IPv4Header {
 	hdrLen := (raw[0] & 0xf) << 2
+	if hdrLen < IPv4HeaderLen {
+		panic(fmt.Errorf("ip header too small: %d", hdrLen))
+	}
+
 	return &IPv4Header{
 		Raw: raw[:hdrLen],
 	}
